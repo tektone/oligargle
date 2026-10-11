@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Oligargle Deez Nuts. Literally.">
+<meta name="description" content="Oligargle Deez Nuts.">
 <title>Oligargle Deez Nuts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -94,7 +94,6 @@ button:focus-visible,a:focus-visible{outline:3px solid var(--sun);outline-offset
       <div class="card">
         <div class="eyebrow">How to play</div>
         <h1>Oligargle <span class="nutz">Deez Nuts</span></h1>
-        <p class="tag">Literally.</p>
         <canvas id="demo" width="380" height="150" aria-label="Animation: drag back, let go, land the nut in the open mouth"></canvas>
         <ul class="how">
           <li><b>1</b><span><em>Drag back</em> from anywhere on the screen, like a slingshot. The nut flies the opposite way.</span></li>
@@ -271,7 +270,7 @@ function drawBackground() {
   b.fillStyle = '#1b1850'; b.fillRect(0, 700, W, H - 700);
   // protesters (drawn live so they can bob and cheer)
   const cols = ['#ff6b57', '#2ec4b6', '#ffc83d', '#8d7bff', '#ff8fb3'], skins = ['#f3c9a5', '#c88b62', '#8a5a3c', '#f6d6c0'];
-  const signs = ['TAX ’EM', '99%', 'FEED ’EM', 'OLIGARGLE DEEZ NUTS', 'PAY UP', 'NO BAILOUTS', 'LITERALLY.', 'GARGLE!'];
+  const signs = ['TAX ’EM', '99%', 'FEED ’EM', 'OLIGARGLE DEEZ NUTS', 'PAY UP', 'NO BAILOUTS', 'GARGLE!'];
   CROWD.length = 0; b.font = '700 9px ' + BODY;
   for (let i = 0; i < 30; i++) {
     const x = (i / 29) * W + (sr() - .5) * 10, y = 700 + sr() * 40, col = cols[Math.floor(sr() * cols.length)], skin = skins[Math.floor(sr() * 4)], ph = sr() * 6, hs = sr() > .6;

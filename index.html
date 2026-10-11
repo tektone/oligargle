@@ -136,7 +136,7 @@ button:focus-visible,a:focus-visible{outline:3px solid var(--sun);outline-offset
 <script>
 // ---- Config: fill these in before going live ----
 const TIP_URL = "";   // e.g. your Ko-fi / Buy Me a Coffee link
-const GAME_URL = "";  // public link to the game, appended to the brag text
+const GAME_URL = "https://tektone.github.io/oligargle/";  // public link to the game, appended to the brag text
 
 (() => {
 const W = 480, H = 760, G = 900, K = 11, MAXPULL = 120, ROUND = 60;
@@ -350,7 +350,18 @@ function drawRoom(b, i) {
 
 // ---------- Audio ----------
 let AC = null, muted = false;
-function audioInit() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (AC && AC.state === 'suspended') AC.resume(); }
+// iPhones route web audio through the ringer channel (muted by the silent switch) unless the page plays real media.
+// Fix: ask for the "playback" audio session and keep a silent looping clip going, which moves our sounds to the media channel.
+let keepAlive = null;
+function silentWav() { const n = 8000, b = new Uint8Array(44 + n), dv = new DataView(b.buffer), w = (o, s) => { for (let i = 0; i < s.length; i++) b[o + i] = s.charCodeAt(i); };
+  w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 8000, true); dv.setUint32(28, 8000, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); w(36, 'data'); dv.setUint32(40, n, true); b.fill(128, 44);
+  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' })); }
+function audioInit() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (!keepAlive) { try { keepAlive = new Audio(silentWav()); keepAlive.loop = true; keepAlive.setAttribute('playsinline', ''); const pr = keepAlive.play(); if (pr && pr.catch) pr.catch(() => { keepAlive = null; }); } catch (e) { keepAlive = null; } }
+}
 function env(g, t, a, d, v) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
 function tone(f1, f2, dur, type = 'sine', vol = .2, delay = 0) {
   if (!AC || muted) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();

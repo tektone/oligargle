@@ -362,6 +362,22 @@ function audioInit() {
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   if (!keepAlive) { try { keepAlive = new Audio(silentWav()); keepAlive.loop = true; keepAlive.setAttribute('playsinline', ''); const pr = keepAlive.play(); if (pr && pr.catch) pr.catch(() => { keepAlive = null; }); } catch (e) { keepAlive = null; } }
 }
+// ---- Soundtrack (routed through WebAudio so volume, ducking and fades also work on iPhone, which ignores audio.volume) ----
+const MUSIC = { file: 'theme.mp3', vol: .9 };   // vol: soundtrack level against the sound effects (0 to 1)
+let musicEl = null, musicGain = null, ducked = false, duckTimer = 0, musicHeld = false;
+const musicLevel = () => muted ? 0 : MUSIC.vol * (ducked ? .35 : 1);
+function setMusicGain(v, tc = .05) { if (!musicGain || !AC) return; const t = AC.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setTargetAtTime(v, t, tc); }
+function musicSetup() {
+  if (musicEl || !AC) return;
+  try { musicEl = new Audio(ART.base + MUSIC.file); musicEl.preload = 'auto'; musicEl.setAttribute('playsinline', ''); musicGain = AC.createGain(); musicGain.gain.value = 0; AC.createMediaElementSource(musicEl).connect(musicGain).connect(AC.destination); }
+  catch (e) { musicEl = null; musicGain = null; }
+}
+function musicStart() { musicSetup(); if (!musicEl) return; try { musicEl.currentTime = 0; } catch (e) {} setMusicGain(musicLevel(), .01); const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); }
+function musicStop() { if (!musicEl) return; setMusicGain(0, .35); const el = musicEl; setTimeout(() => { if (st.mode !== 'play') el.pause(); }, 1800); }
+function musicPause() { if (musicEl && !musicEl.paused) { musicEl.pause(); musicHeld = true; } }
+function musicResume() { if (musicEl && musicHeld) { musicHeld = false; setMusicGain(musicLevel(), .01); const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); } }
+function duckMusic(ms = 1600) { ducked = true; setMusicGain(musicLevel(), .05); clearTimeout(duckTimer); duckTimer = setTimeout(() => { ducked = false; setMusicGain(musicLevel(), .3); }, ms); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) musicPause(); else if (st.mode === 'play' && !paused) musicResume(); });
 function env(g, t, a, d, v) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
 function tone(f1, f2, dur, type = 'sine', vol = .2, delay = 0) {
   if (!AC || muted) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
@@ -391,7 +407,7 @@ const sfx = {
   crash() { tone(400, 60, .9, 'sawtooth', .12); },
   end() { [784, 659, 523, 392].forEach((f, i) => tone(f, f * .98, .18, 'triangle', .14, i * .14)); },
   chef() { [659, 784, 988, 1319].forEach((f, i) => tone(f, f, .1, 'triangle', .13, i * .06)); },
-  say(text, pitch = 1.1, rate = 1.05) { if (muted) return; try { const u = new SpeechSynthesisUtterance(text); u.rate = rate; u.pitch = pitch; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} },
+  say(text, pitch = 1.1, rate = 1.05) { if (muted) return; duckMusic(); try { const u = new SpeechSynthesisUtterance(text); u.rate = rate; u.pitch = pitch; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} },
 };
 
 // ---------- State ----------
@@ -566,7 +582,7 @@ function collide(n) {
 function bounceOff(n, o) { n.spent = true; n.vy = -Math.abs(n.vy) * .3 - 140; n.vx = (n.x - o.x) * 7 + rnd(-40, 40); n.vr *= -2; }
 
 function endRound() {
-  st.mode = 'over'; aim = null; sfx.end();
+  st.mode = 'over'; aim = null; sfx.end(); musicStop();
   if (st.score > best) { best = st.score; try { localStorage.setItem('ogdn-best', String(best)); } catch (e) {} }
   let rank = RANKS[0][1], line = RANKS[0][2]; for (const [s, r, l] of RANKS) if (st.score >= s) { rank = r; line = l; } st.rank = rank; $('oLine').textContent = line;
   $('oRank').textContent = rank; $('oScore').textContent = st.score.toLocaleString();
@@ -888,11 +904,11 @@ function frame(now) {
 // ---------- UI wiring ----------
 function showBest(el) { $(el).textContent = best ? 'Personal best: ' + best.toLocaleString() : ''; }
 function openStart() { $('start').hidden = false; cancelAnimationFrame(demoRaf); demoRaf = requestAnimationFrame(demoLoop); showBest('bestStart'); }
-function start() { audioInit(); resetRound(); $('start').hidden = true; $('over').hidden = true; lastHud = ''; }
-$('play').addEventListener('click', () => { if (paused) { paused = false; $('start').hidden = true; $('play').textContent = 'Start Redistributing'; } else start(); });
+function start() { audioInit(); resetRound(); musicStart(); $('start').hidden = true; $('over').hidden = true; lastHud = ''; }
+$('play').addEventListener('click', () => { if (paused) { paused = false; musicResume(); $('start').hidden = true; $('play').textContent = 'Start Redistributing'; } else start(); });
 $('again').addEventListener('click', start);
-$('help').addEventListener('click', () => { if (st.mode === 'play') { paused = true; aim = null; $('play').textContent = 'Back to the game'; } openStart(); });
-$('mute').addEventListener('click', () => { muted = !muted; $('mute').setAttribute('aria-pressed', String(muted)); $('mute').setAttribute('aria-label', muted ? 'Sound off' : 'Sound on'); });
+$('help').addEventListener('click', () => { if (st.mode === 'play') { paused = true; aim = null; musicPause(); $('play').textContent = 'Back to the game'; } openStart(); });
+$('mute').addEventListener('click', () => { muted = !muted; $('mute').setAttribute('aria-pressed', String(muted)); $('mute').setAttribute('aria-label', muted ? 'Sound off' : 'Sound on'); setMusicGain(musicLevel(), .05); });
 if (TIP_URL) { $('tip').href = TIP_URL; $('tip').hidden = false; }
 $('share').addEventListener('click', () => {
   const text = (st.gargled ? `I made ${st.gargled} oligarch${st.gargled === 1 ? '' : 's'} gargle my nuts in Oligargle Deez Nuts. ${st.score.toLocaleString()} points. Rank: ${st.rank}. Your turn.` : `I fed zero oligarchs in Oligargle Deez Nuts. They’re safe. For now. Your turn.`) + (GAME_URL ? ' ' + GAME_URL : '');
